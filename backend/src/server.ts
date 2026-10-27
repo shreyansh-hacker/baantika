@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
@@ -42,7 +42,7 @@ if (env.NODE_ENV !== 'test') {
 }
 
 // Liveness check (process status only)
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'ok',
     version: '1.0.0',
@@ -51,7 +51,7 @@ app.get('/health', (_req, res) => {
 });
 
 // Readiness check (checks database connectivity)
-app.get('/ready', async (_req, res) => {
+app.get('/ready', async (_req: Request, res: Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
     res.status(200).json({
@@ -81,7 +81,7 @@ app.use('/api/v1/groups/:groupId/activity', activityRouter);
 app.use('/api/v1/activity', activityRouter);
 
 // 404 handler
-app.use((_req, res) => {
+app.use((_req: Request, res: Response) => {
   res.status(404).json({
     success: false,
     error: {
