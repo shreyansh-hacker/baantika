@@ -60,6 +60,36 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
 }
 
 /**
+ * Soft delete account, anonymizing display name to 'Deleted User' and revoking sessions.
+ */
+export async function softDeleteAccount(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId, isDeleted: false },
+  });
+
+  if (!user) {
+    throw new NotFoundError('User not found');
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        isDeleted: true,
+        displayName: 'Deleted User',
+        avatarUrl: null,
+      },
+    }),
+    prisma.refreshSession.updateMany({
+      where: { userId },
+      data: { revoked: true },
+    }),
+  ]);
+
+  return { message: 'Account deactivated and anonymized successfully' };
+}
+
+/**
  * Get dashboard data: total balance across all groups.
  */
 export async function getDashboard(userId: string) {
@@ -129,7 +159,6 @@ export async function getDashboard(userId: string) {
   const totalSettlementsPaid = settlementsPaid._sum.amountPaise ?? 0;
 
   // Net balance = totalPaid - totalOwed + settlementsReceived - settlementsPaid
-  // Positive means others owe you, negative means you owe others
   const netBalance = totalPaid - totalOwed + totalSettlementsReceived - totalSettlementsPaid;
 
   const totalToReceive = netBalance > 0 ? netBalance : 0;

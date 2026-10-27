@@ -7,3 +7,5 @@ export const updateProfileInputSchema = z.object({
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileInputSchema>;
+
+export const updateProfileSchema = updateProfileInputSchema;
