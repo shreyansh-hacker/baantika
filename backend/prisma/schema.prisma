@@ -1,0 +1,232 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  displayName  String   @map("display_name")
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  currency     String   @default("INR")
+  isDeleted    Boolean  @default(false) @map("is_deleted")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshSessions RefreshSession[]
+  groupMembers    GroupMember[]
+  createdGroups   Group[]          @relation("GroupCreator")
+  createdExpenses Expense[]        @relation("ExpenseCreator")
+  expensePayers   ExpensePayer[]
+  expenseSplits   ExpenseSplit[]
+  sentInvitations Invitation[]     @relation("InvitationSender")
+  settlementsAsPayer  Settlement[] @relation("SettlementPayer")
+  settlementsAsPayee  Settlement[] @relation("SettlementPayee")
+  settlementsCreated  Settlement[] @relation("SettlementCreator")
+  settlementsCompleted Settlement[] @relation("SettlementCompleter")
+  activityEvents  ActivityEvent[]
+
+  @@map("users")
+}
+
+model RefreshSession {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @map("token_hash")
+  deviceInfo String?  @map("device_info")
+  expiresAt  DateTime @map("expires_at")
+  revoked    Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_sessions")
+}
+
+model Group {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  currency    String   @default("INR")
+  createdById String   @map("created_by_id") @db.Uuid
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy   User          @relation("GroupCreator", fields: [createdById], references: [id])
+  members     GroupMember[]
+  expenses    Expense[]
+  settlements Settlement[]
+  invitations Invitation[]
+  activities  ActivityEvent[]
+
+  @@map("groups")
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model GroupMember {
+  id        String    @id @default(uuid()) @db.Uuid
+  groupId   String    @map("group_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  removedAt DateTime? @map("removed_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model Invitation {
+  id          String           @id @default(uuid()) @db.Uuid
+  groupId     String           @map("group_id") @db.Uuid
+  invitedById String           @map("invited_by_id") @db.Uuid
+  inviteEmail String?          @map("invite_email")
+  inviteCode  String           @unique @map("invite_code")
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime         @map("expires_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  group     Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  invitedBy User  @relation("InvitationSender", fields: [invitedById], references: [id])
+
+  @@index([inviteCode])
+  @@index([groupId])
+  @@map("invitations")
+}
+
+enum SplitMethod {
+  EQUAL
+  EXACT
+  PERCENTAGE
+  SHARES
+}
+
+model Expense {
+  id             String      @id @default(uuid()) @db.Uuid
+  groupId        String      @map("group_id") @db.Uuid
+  description    String
+  amountPaise    Int         @map("amount_paise")
+  expenseDate    DateTime    @map("expense_date") @db.Date
+  category       String?
+  splitMethod    SplitMethod @map("split_method")
+  createdById    String      @map("created_by_id") @db.Uuid
+  idempotencyKey String?     @unique @map("idempotency_key")
+  notes          String?
+  isDeleted      Boolean     @default(false) @map("is_deleted")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  group     Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("ExpenseCreator", fields: [createdById], references: [id])
+  payers    ExpensePayer[]
+  splits    ExpenseSplit[]
+
+  @@index([groupId])
+  @@index([createdById])
+  @@index([idempotencyKey])
+  @@map("expenses")
+}
+
+model ExpensePayer {
+  id          String @id @default(uuid()) @db.Uuid
+  expenseId   String @map("expense_id") @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+  amountPaise Int    @map("amount_paise")
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+  @@index([expenseId])
+  @@map("expense_payers")
+}
+
+model ExpenseSplit {
+  id          String @id @default(uuid()) @db.Uuid
+  expenseId   String @map("expense_id") @db.Uuid
+  userId      String @map("user_id") @db.Uuid
+  amountPaise Int    @map("amount_paise")
+  shareValue  Float? @map("share_value")
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+  @@index([expenseId])
+  @@map("expense_splits")
+}
+
+enum SettlementStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Settlement {
+  id            String           @id @default(uuid()) @db.Uuid
+  groupId       String           @map("group_id") @db.Uuid
+  payerId       String           @map("payer_id") @db.Uuid
+  payeeId       String           @map("payee_id") @db.Uuid
+  amountPaise   Int              @map("amount_paise")
+  status        SettlementStatus @default(PENDING)
+  createdById   String           @map("created_by_id") @db.Uuid
+  completedById String?          @map("completed_by_id") @db.Uuid
+  note          String?
+  completedAt   DateTime?        @map("completed_at")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  group       Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payer       User  @relation("SettlementPayer", fields: [payerId], references: [id])
+  payee       User  @relation("SettlementPayee", fields: [payeeId], references: [id])
+  createdBy   User  @relation("SettlementCreator", fields: [createdById], references: [id])
+  completedBy User? @relation("SettlementCompleter", fields: [completedById], references: [id])
+
+  @@index([groupId])
+  @@index([payerId])
+  @@index([payeeId])
+  @@map("settlements")
+}
+
+model ActivityEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  groupId    String?  @map("group_id") @db.Uuid
+  actorId    String   @map("actor_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id") @db.Uuid
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  group Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  actor User   @relation(fields: [actorId], references: [id])
+
+  @@index([groupId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("activity_events")
+}

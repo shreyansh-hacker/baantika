@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+
+# Mobile
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/release/
+mobile/android/app/debug/
+mobile/*.keystore
+mobile/*.jks
+
+# Backend
+backend/dist/
+backend/coverage/
+backend/prisma/*.db
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+google-services.json
